@@ -1,0 +1,540 @@
+version: "3"
+services:
+
+############################################################################
+#                       MULTIMEDIA                                         #
+############################################################################
+  jellyfin:
+    container_name: jellyfin
+    image: jellyfin/jellyfin
+    restart: unless-stopped
+    network_mode: "host"    
+#    ports:
+#      - 8096:8096
+    volumes:
+      - ${DOCKERSDIR}/jellyfin/config:/config
+      - ${DOCKERSDIR}/jellyfin/cache:/cache
+      - ${SERIESDIR}:/media/tv
+      - ${PELISDIR}:/media/movies
+      - ${MUSICADIR}:/media/music
+      - /etc/localtime:/etc/localtime:ro
+    user: ${PUID}:${PGID}
+
+  sonarr:
+    container_name: sonarr
+    image: ghcr.io/linuxserver/sonarr
+    restart: unless-stopped
+    ports:
+      - 8989:8989
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+    volumes:
+      - ${DOCKERSDIR}/sonarr:/config
+      - ${DLDIR}:/downloads
+      - ${SERIESDIR}:/tv
+      - /etc/localtime:/etc/localtime:ro
+    depends_on:
+      - jackett
+      - qbittorrent
+
+  radarr:
+    container_name: radarr
+    image: ghcr.io/linuxserver/radarr
+    restart: unless-stopped
+    ports:
+      - 7878:7878
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+    volumes:
+      - ${DOCKERSDIR}/radarr:/config
+#      - ${DLDIR}/completed:/downloads
+      - ${DLDIR}:/downloads
+      - ${PELISDIR}:/movies
+#      - /etc/localtime:/etc/localtime:ro
+    depends_on:
+      - jackett
+      - qbittorrent
+  
+  qbittorrent:
+    image: ghcr.io/linuxserver/qbittorrent
+    container_name: qbittorrent
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+    volumes:
+      - ${DOCKERSDIR}/qbittorrent/config:/config
+      - ${DLDIR}:/downloads
+    ports:
+      - 6881:6881
+      - 6881:6881/udp
+      - 8080:8080
+    restart: unless-stopped
+
+  jackett:
+    image: ghcr.io/linuxserver/jackett
+    container_name: jackett
+    restart: unless-stopped
+    ports:
+      - 9117:9117
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+    volumes:
+      - ${DOCKERSDIR}/jackett:/config
+      - ${DLDIR}/completed:/downloads
+      - /etc/localtime:/etc/localtime:ro
+    # sysctls:
+    #   - net.ipv6.conf.all.disable_ipv6=1
+
+  # ombi:
+  #   image: ghcr.io/linuxserver/ombi
+  #   container_name: ombi
+  #   restart: unless-stopped
+  #   ports:
+  #     - 3579:3579
+  #   environment:
+  #     - PUID=${PUID}
+  #     - PGID=${PGID}
+  #   volumes:
+  #     - ${DOCKERSDIR}/ombi:/config
+  #     - /etc/localtime:/etc/localtime:ro
+  #   depends_on:
+  #     - radarr
+  #     - sonarr
+  
+  calibre:
+    image: y484v/calibre
+    container_name: calibre
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+    volumes:
+      - ${DOCKERSDIR}/calibre:/config
+      - ${LOGS}/calibre:/var/log
+      - ${LIBROSDIR}:/books 
+    ports:
+      - 8083:8083
+    restart: always
+
+#   airsonic:
+#     image: lscr.io/linuxserver/airsonic-advanced
+#     container_name: airsonic
+#     environment:
+#       - PUID=${PUID}
+#       - PGID=${PGID}
+#       - TZ=${TZ}
+# #      - CONTEXT_PATH=URL_BASE #optional
+# #      - JAVA_OPTS=options #optional
+#     volumes:
+#       - ${DOCKERSDIR}/airsonic/config:/config
+#       - ${MUSICADIR}:/music
+#       - ${DOCKERSDIR}/airsonic/playlists:/playlists
+#       - ${DOCKERSDIR}/airsonic/podcasts:/podcasts
+#       - ${DOCKERSDIR}/airsonic/otros:/media
+#     ports:
+#       - 4040:4040
+# #     devices:
+# #       - /dev/snd:/dev/snd #optional
+#     restart: unless-stopped
+
+  navidrome:
+    image: deluan/navidrome:latest
+    container_name: navidrome
+    user: ${PUID}:${PGID} # should be owner of volumes
+    ports:
+      - "4533:4533"
+    restart: unless-stopped
+    environment:
+      # Optional: put your config options customization here. Examples:
+      ND_SCANSCHEDULE: 1h
+      ND_LOGLEVEL: info  
+      ND_SESSIONTIMEOUT: 24h
+      ND_BASEURL: ""
+      ND_TRANSCODINGCACHESIZE: 100MB
+    volumes:
+      - "${DOCKERSDIR}/navidrome:/data"
+      - "${MUSICADIR}:/music:ro"
+  
+  prowlarr:
+    image: ghcr.io/linuxserver/prowlarr:develop
+    container_name: prowlarr
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+    volumes:
+      - $HOME/docker/prowlarr:/config
+    ports:
+      - 9696:9696
+    restart: unless-stopped
+
+  # bazarr:
+  #   image: lscr.io/linuxserver/bazarr
+  #   container_name: bazarr
+  #   environment:
+  #     - PUID=${PUID}
+  #     - PGID=${PGID}
+  #     - TZ=${TZ}
+  #   volumes:
+  #     - ${DOCKERSDIR}/bazarr:/config
+  #     - ${PELISDIR}:/movies
+  #     - ${SERIESDIR}:/tv
+  #   ports:
+  #     - 6767:6767
+  #   restart: "no"
+  
+####################################################################
+#              DOMINIOS, CERTIFICADOS Y PROXY                      #
+####################################################################
+
+  duckdns:
+    image: ghcr.io/linuxserver/duckdns
+    container_name: duckdns
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+      - SUBDOMAINS=${SUBDOMINIOS}
+      - TOKEN=${DUCK_TOKEN}
+      - LOG_FILE=true 
+    volumes:
+      - $HOME/docker/duckdns/config:/config
+    restart: unless-stopped
+
+  swag:
+    image: ghcr.io/linuxserver/swag
+    container_name: swag
+    cap_add:
+      - NET_ADMIN
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+      - URL=${DUCKURL}
+      - SUBDOMAINS=wildcard
+      - VALIDATION=duckdns
+      - DUCKDNSTOKEN=${DUCK_TOKEN}
+      - EMAIL=${DUCKMAIL}
+      - DHLEVEL=2048
+      - ONLY_SUBDOMAINS=true
+    volumes:
+      - ${DOCKERSDIR}/swag:/config
+    ports:
+      - 443:443
+      - 80:80
+    restart: unless-stopped
+
+###############################################################################
+#                              NEXTCLOUD                                      #
+###############################################################################
+
+  mariadb:
+    image: ghcr.io/linuxserver/mariadb:alpine
+    container_name: mariadb
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+      - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD}
+      - MYSQL_DATABASE=${MYSQL_DATABASE}
+      - MYSQL_USER=${MYSQL_USER}
+      - MYSQL_PASSWORD=${CONTRASENA}
+    volumes:
+      - ${DOCKERSDIR}/mariadb/:/config
+      - ${DOCKERSDIR}/mariadb/conf.d:/etc/mysql/conf.d
+    ports:
+      - 3306:3306
+    restart: unless-stopped
+
+  nextcloud:
+    image: ghcr.io/linuxserver/nextcloud
+    container_name: nube
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+    volumes:
+      - ${DOCKERSDIR}/nube/appdata:/config
+      - ${DOCKERSDIR}/nube/data:/data
+    ports:
+      - 2443:443
+      - 280:80
+    external_links:
+      - mariadb:mariadb
+    depends_on:
+      - mariadb
+    restart: always
+
+##############################################################################
+#                         DOMOTICA                                           #
+##############################################################################
+
+  homeassistant:
+    container_name: ha
+    image: "ghcr.io/home-assistant/home-assistant:stable"
+    volumes:
+      - ${DOCKERSDIR}/homeassistant:/config
+      - /etc/localtime:/etc/localtime:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      - TZ=${TZ}
+    devices:
+      - /dev/ttyACM0:/dev/ttyACM0
+      - /dev/serial/by-id/usb-dresden_elektronik_ingenieurtechnik_GmbH_ConBee_II_DE2252437-if00:/dev/serial/by-id/usb-dresden_elektronik_ingenieurtechnik_GmbH_ConBee_II_DE2252437-if00
+    restart: always
+    privileged: true
+    restart: unless-stopped
+#    ports:
+#      - 8123:8123
+    network_mode: "host"
+
+  # node-red:
+  #   image: nodered/node-red
+  #   container_name: node
+  #   environment:
+  #     - TZ=${TZ}
+  #   ports:
+  #     - "1880:1880"
+  #   volumes:
+  #     - ${DOCKERSDIR}/nodered/data:/data
+  #   restart: unless-stopped
+
+  # mosquitto:
+  #   image: mbixtech/arm32v7-mosquitto
+  #   hostname: mosquitto
+  #   container_name: mosquitto
+  #   expose:
+  #     - "1883"
+  #   ports:
+  #     - "1883:1883"
+  #   volumes:
+  #     - ${DOCKERSDIR}/mqtt/config:/config
+  #     - ${DOCKERSDIR}/mqtt/data:/data
+  #     - ${LOGS}/mqtt:/log
+  #   restart: unless-stopped
+
+  deconz:
+    image: deconzcommunity/deconz:stable
+    container_name: deconz
+    network_mode: host
+    restart: always
+    volumes:
+      - ${DOCKERSDIR}/deconz:/opt/deCONZ
+    devices:
+        - /dev/ttyACM0
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+      - DECONZ_WEB_PORT=480
+      - DECONZ_WS_PORT=4443
+      - DECONZ_VNC_MODE=1
+      - DECONZ_VNC_PORT=5902
+      - DECONZ_VNC_PASSWORD=${CONTRASENA}
+      # - DEBUG_INFO=1
+      # - DEBUG_APS=0
+      # - DEBUG_ZCL=0
+      # - DEBUG_ZDP=0
+      # - DEBUG_OTAU=0
+
+
+  # zigbee2mqtt:
+  #   container_name: zigbee2mqtt
+  #   image: koenkk/zigbee2mqtt
+  #   volumes:
+  #     - ${DOCKERSDIR}/zigbee2mqtt/data:/app/data
+  #     - /run/udev:/run/udev:ro
+  #   devices:
+  #     - /dev/ttyACM0:/dev/ttyACM0
+  #   restart: always
+  #   network_mode: host
+  #   privileged: true
+  #   environment:
+  #     - TZ=${TZ}
+
+
+######################################################################################
+#                        SISTEMA                                                     #
+######################################################################################
+
+  portainer:
+    image: portainer/portainer-ce
+    container_name: portainer
+    restart: always
+    ports:
+      - 9000:9000
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ${DOCKERSDIR}/portainer/portainer_data:/data
+
+  adguard-home:
+    image: adguard/adguardhome
+    container_name: "adguard"
+    network_mode: host
+    restart: unless-stopped
+    # dns:
+    #   - 127.0.0.1
+    #   - 1.1.1.1
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+    # ports:
+    #   - '53:53/tcp'
+    #   - '53:53/udp'
+    #   - '67:67/udp'
+    #   - '68:68/tcp'
+    #   - '68:68/udp'
+    #   - '80:80/tcp'
+    #   - '443:443/tcp'
+    #   - '8053:80/tcp'
+    #   - '853:853/tcp'
+    #   - '3000:3000/tcp'
+    volumes:
+      - ${DOCKERSDIR}/adguard/work:/opt/adguardhome/work:rw
+      - ${DOCKERSDIR}/adguard/confdir:/opt/adguardhome/conf:rw
+    restart: unless-stopped
+
+  wireguard:
+    image: ghcr.io/linuxserver/wireguard
+    container_name: wireguard
+    cap_add:
+      - NET_ADMIN
+      - SYS_MODULE
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+      - SERVERURL=${URL_WIREGUARD} 
+      - SERVERPORT=51820 
+      - PEERS=MVJ,MVS,PTS,PCTJ,PTE,PTX,TBE,MVE
+      - PEERDNS=auto 
+      - INTERNAL_SUBNET=10.13.13.0
+    volumes:
+      - ${DOCKERSDIR}/wireguard:/config
+      - ${LOGS}/wireguard:/var/log
+      - /lib/modules:/lib/modules
+      # - /usr/scr:/usr/scr
+    ports:
+      - 51820:51820/udp
+    sysctls:
+      - net.ipv4.conf.all.src_valid_mark=1
+    restart: unless-stopped
+
+  heimdall:
+    image: ghcr.io/linuxserver/heimdall
+    container_name: heimdall
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+    volumes:
+      - ${DOCKERSDIR}/heimdall/config:/config
+    ports:
+      - 380:80
+      - 3443:443
+    restart: unless-stopped
+    
+  diun:
+    image: ghcr.io/crazy-max/diun
+    container_name: diun
+    hostname: raspberry
+    volumes:
+      - ${DOCKERSDIR}/diun/data:/data
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    environment:
+      - TZ=${TZ}
+      - LOG_LEVEL=info
+      - DIUN_DB_PATH=diun.db
+      - DIUN_WATCH_WORKERS=10
+      - DIUN_WATCH_SCHEDULE=0 12 * * *
+      - DIUN_PROVIDERS_DOCKER=true
+      - DIUN_PROVIDERS_DOCKER_WATCHBYDEFAULT=true
+      - DIUN_NOTIF_TELEGRAM_TOKEN=${TELEGRAM_CHAT_TOKEN}
+      - DIUN_NOTIF_TELEGRAM_CHATIDS=${TELEGRAM_ID}
+    restart: unless-stopped
+    # labels:
+    #   - diun.enable=true
+    #   - diun.watch_repo=true
+
+  duplicati:
+    image: ghcr.io/linuxserver/duplicati
+    container_name: duplicati
+    environment:
+      - PUID=0
+      - PGID=0
+      - TZ=${TZ}
+    volumes:
+      - ${DOCKERSDIR}/duplicati/config:/config
+      - ${DOCKERSDIR}/duplicati/backups:/backups
+      - ${DOCKERSDIR}:/source
+    ports:
+      - 8200:8200
+    restart: unless-stopped
+
+  filebrowser:
+    image: filebrowser/filebrowser
+    container_name: filebrowser
+    user: "${PUID}:${PGID}"
+    ports:
+      - 580:80
+    volumes:
+      - ${HOME}:/srv
+      - ${DOCKERSDIR}/filebrowser/filebrowser.db:/database.db
+      - ${DOCKERSDIR}/filebrowser/.filebrowser.json:/.filebrowser.json
+    restart: unless-stopped
+
+  bitwarden:
+    image: vaultwarden/server:latest
+    container_name: vaultwarden
+    restart: always
+    environment:
+      - WEBSOCKET_ENABLED=true  # Enable WebSocket notifications.
+      - ADMIN_TOKEN=${BITWARDEN_TOKEN}
+    volumes:
+      - $HOME/docker/bitwarden/data:/data
+    ports:
+      - "680:80" # web ui
+
+  scrutiny:
+    image: lscr.io/linuxserver/scrutiny
+    container_name: scrutiny
+    cap_add:
+      - SYS_RAWIO
+      - SYS_ADMIN #optional
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+      - SCRUTINY_API_ENDPOINT=http://localhost:8080
+      - SCRUTINY_WEB=true
+      - SCRUTINY_COLLECTOR=true
+    volumes:
+      - $HOME/docker/scrutiny/:/config
+      - /run/udev:/run/udev:ro
+    ports:
+      - 8081:8080
+    devices:
+      - /dev/sda:/dev/sda
+      - /dev/sdb:/dev/sdb
+    restart: unless-stopped
+
+volumes:
+  portainer_data:
+  db:
+    driver: local
+  music:
+    driver: local
+  covers:
+    driver: local
+  search_index:
+    driver: local
+
+
