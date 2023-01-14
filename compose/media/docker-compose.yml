@@ -1,0 +1,292 @@
+version: "3"
+#name: media
+services:
+
+############################################################################
+#                       MULTIMEDIA                                         #
+############################################################################
+  jellyfin:
+    container_name: jellyfin
+    image: jellyfin/jellyfin
+    restart: unless-stopped
+    network_mode: host    
+#    ports:
+#      - 8096:8096
+    volumes:
+      - ${DOCKERSDIR}/jellyfin/config:/config
+      - ${DOCKERSDIR}/jellyfin/cache:/cache
+      - ${SERIESDIR}:/media/tv
+      - ${PELISDIR}:/media/movies
+      - ${MUSICADIR}:/media/music
+      - /etc/localtime:/etc/localtime:ro
+    user: ${PUID}:${PGID}
+
+  sonarr:
+    container_name: sonarr
+    image: ghcr.io/linuxserver/sonarr
+    restart: unless-stopped
+    ports:
+      - 8989:8989
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+    volumes:
+      - ${DOCKERSDIR}/sonarr:/config
+      - ${DLDIR}:/downloads
+      - ${SERIESDIR}:/tv
+      - /etc/localtime:/etc/localtime:ro
+    depends_on:
+      - jackett
+      - qbittorrent
+    networks:
+        sistema_default:
+            ipv4_address: ${APP_SONARR_IP}
+      
+  # medusa:
+  #   image: lscr.io/linuxserver/medusa:latest
+  #   container_name: medusa
+  #   environment:
+  #     - PUID=${PUID}
+  #     - PGID=${PGID}
+  #     - TZ=${TZ}
+  #   volumes:
+  #     - ${DOCKERSDIR}/medusa:/config
+  #     - ${DLDIR}:/downloads
+  #     - ${SERIESDIR}:/tv
+  #   ports:
+  #     - 8082:8081
+  #   restart: unless-stopped
+  #   depends_on:
+  #     - jackett
+  #     - qbittorrent
+  #   networks:
+  #       default:
+  #           ipv4_address: 172.20.0.4
+
+  radarr:
+    container_name: radarr
+    image: ghcr.io/linuxserver/radarr
+    restart: unless-stopped
+    ports:
+      - 7878:7878
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+    volumes:
+      - ${DOCKERSDIR}/radarr:/config
+#      - ${DLDIR}/completed:/downloads
+      - ${DLDIR}:/downloads
+      - ${PELISDIR}:/movies
+#      - /etc/localtime:/etc/localtime:ro
+    depends_on:
+      - jackett
+      - qbittorrent
+    networks:
+        sistema_default:
+            ipv4_address: ${APP_RADARR_IP}
+  
+  qbittorrent:
+    image: lscr.io/linuxserver/qbittorrent:latest
+    container_name: qbittorrent
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+      - WEBUI_PORT=8080
+    volumes:
+      - ${DOCKERSDIR}/qbittorrent/config:/config
+      - ${DLDIR}:/downloads
+    ports:
+      - 6881:6881
+      - 6881:6881/udp
+      - 8080:8080
+    restart: unless-stopped
+    networks:
+        sistema_default:
+            ipv4_address: ${APP_QBIT_IP}
+
+  jackett:
+    image: ghcr.io/linuxserver/jackett
+    container_name: jackett
+    restart: unless-stopped
+    ports:
+      - 9117:9117
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+      - AUTO_UPDATE=true
+    volumes:
+      - ${DOCKERSDIR}/jackett:/config
+      - ${DLDIR}/completed:/downloads
+      - /etc/localtime:/etc/localtime:ro
+    networks:
+        sistema_default:
+            ipv4_address: ${APP_JACKETT_IP}
+    # sysctls:
+    #   - net.ipv6.conf.all.disable_ipv6=1
+
+  # ombi:
+  #   image: ghcr.io/linuxserver/ombi
+  #   container_name: ombi
+  #   restart: unless-stopped
+  #   ports:
+  #     - 3579:3579
+  #   environment:
+  #     - PUID=${PUID}
+  #     - PGID=${PGID}
+  #   volumes:
+  #     - ${DOCKERSDIR}/ombi:/config
+  #     - /etc/localtime:/etc/localtime:ro
+  #   depends_on:
+  #     - radarr
+  #     - sonarr
+  
+  calibre:
+    image: y484v/calibre
+    container_name: calibre
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+    volumes:
+      - ${DOCKERSDIR}/calibre:/config
+      - ${LOGS}/calibre:/var/log
+      - ${LIBROSDIR}:/books 
+    ports:
+      - 8083:8083
+    restart: always
+    networks:
+        sistema_default:
+            ipv4_address: ${APP_CALIBRE_IP}
+
+#   airsonic:
+#     image: lscr.io/linuxserver/airsonic-advanced
+#     container_name: airsonic
+#     environment:
+#       - PUID=${PUID}
+#       - PGID=${PGID}
+#       - TZ=${TZ}
+# #      - CONTEXT_PATH=URL_BASE #optional
+# #      - JAVA_OPTS=options #optional
+#     volumes:
+#       - ${DOCKERSDIR}/airsonic/config:/config
+#       - ${MUSICADIR}:/music
+#       - ${DOCKERSDIR}/airsonic/playlists:/playlists
+#       - ${DOCKERSDIR}/airsonic/podcasts:/podcasts
+#       - ${DOCKERSDIR}/airsonic/otros:/media
+#     ports:
+#       - 4040:4040
+# #     devices:
+# #       - /dev/snd:/dev/snd #optional
+#     restart: unless-stopped
+
+  navidrome:
+    image: deluan/navidrome:latest
+    container_name: navidrome
+    user: ${PUID}:${PGID} # should be owner of volumes
+    ports:
+      - "4533:4533"
+    restart: unless-stopped
+    environment:
+      # Optional: put your config options customization here. Examples:
+      ND_SCANSCHEDULE: 1h
+      ND_LOGLEVEL: info  
+      ND_SESSIONTIMEOUT: 24h
+      ND_BASEURL: ""
+      ND_TRANSCODINGCACHESIZE: 100MB
+    volumes:
+      - "${DOCKERSDIR}/navidrome:/data"
+      - "${MUSICADIR}:/music:ro"
+    networks:
+        sistema_default:
+            ipv4_address: ${APP_NAVIDROME_IP}
+  
+  prowlarr:
+    image: cr.hotio.dev/hotio/prowlarr:testing
+    container_name: prowlarr
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+      - UMASK=002
+    volumes:
+      - $HOME/docker/prowlarr:/config
+    ports:
+      - 9697:9696
+    restart: unless-stopped
+    networks:
+      sistema_default:
+          ipv4_address: ${APP_PROWLARR_IP}
+
+  bazarr:
+    image: lscr.io/linuxserver/bazarr:latest
+    container_name: bazarr
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+    volumes:
+      - ${DOCKERSDIR}/bazarr:/config
+      - ${PELISDIR}:/movies
+      - ${SERIESDIR}:/tv
+    ports:
+      - 6767:6767
+    restart: unless-stopped
+    networks:
+      sistema_default:
+          ipv4_address: ${APP_BAZARR_IP}
+
+  jellyseerr:
+    image: fallenbagel/jellyseerr:latest
+    container_name: jellyseerr
+    environment:
+      - LOG_LEVEL=debug
+      - TZ=${TZ}
+    ports:
+        - 5055:5055
+    volumes:
+      - ${APP_DATA_DIR}/jellyseerr/config:/app/config
+    restart: unless-stopped
+    networks:
+      sistema_default:
+          ipv4_address: ${APP_JELLYSEERR_IP}
+
+  # transmission:
+  #   image: lscr.io/linuxserver/transmission:latest
+  #   container_name: transmission
+  #   environment:
+  #     - PUID=${PUID}
+  #     - PGID=${PGID}
+  #     - TZ=${TZ}
+  #     - TRANSMISSION_WEB_HOME=/combustion-release/ #optional
+  #     - USER=${USER} #optional
+  #     - PASS=${PASS} #optional
+  #     - WHITELIST=iplist #optional
+  #     - PEERPORT=peerport #optional
+  #     - HOST_WHITELIST=dnsname list #optional
+  #   volumes:
+  #     - ${DOCKERSDIR}/transmission/config:/config
+  #     - ${DLDIR}:/downloads:/downloads
+  #     - ${DLDIR}:/downloads:/watch
+  #   ports:
+  #     - 9091:9091
+  #     - 51413:51413
+  #     - 51413:51413/udp
+  #   restart: unless-stopped
+  #   networks:
+  #     sistema_default:
+  #         ipv4_address: ${APP_TRANSMISSION_IP}
+
+# Redes
+#networks:
+#  default:
+#    ipam:
+#      driver: default
+#      config:
+#        - subnet: 172.20.0.0/24
+networks:
+  sistema_default:
+     external: true
