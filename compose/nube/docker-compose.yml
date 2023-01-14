@@ -1,0 +1,84 @@
+version: "3"
+# name: nube
+services:
+
+###############################################################################
+#                              NEXTCLOUD                                      #
+###############################################################################
+
+  mariadb:
+    image: ghcr.io/linuxserver/mariadb:alpine
+    container_name: mariadb
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+      - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD}
+      - MYSQL_DATABASE=${MYSQL_DATABASE}
+      - MYSQL_USER=${MYSQL_USER}
+      - MYSQL_PASSWORD=${CONTRASENA}
+    volumes:
+      - ${DOCKERSDIR}/mariadb/:/config
+      - ${DOCKERSDIR}/mariadb/conf.d:/etc/mysql/conf.d
+    ports:
+      - 3306:3306
+    restart: unless-stopped
+    networks:
+        sistema_default:
+            ipv4_address: ${APP_MARIADB_IP}
+
+  nextcloud:
+    image: ghcr.io/linuxserver/nextcloud
+    container_name: nube
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+    volumes:
+      - ${DOCKERSDIR}/nube/appdata:/config
+      - ${DATOSNUBE}:/data
+    ports:
+      - 2443:443
+      - 280:80
+    external_links:
+      - mariadb:mariadb
+    depends_on:
+      - mariadb
+    restart: always
+    networks:
+        sistema_default:
+            ipv4_address: ${APP_NEXTCLOUD_IP}
+
+
+###############################################################################
+#                              RECETAS                                        #
+###############################################################################  
+
+  mealie:
+    container_name: mealie
+    image: hkotel/mealie:latest
+    restart: always
+    ports:
+      - 9925:80
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+    volumes:
+      - ${DOCKERSDIR}/mealie/data:/app/data
+    restart: unless-stopped
+    networks:
+        sistema_default:
+            ipv4_address: ${APP_MEALIE_IP}
+
+# Redes
+#networks:
+#  default:
+#    ipam:
+#      driver: default
+#      config:
+#        - subnet: 172.20.0.0/24
+networks:
+  sistema_default:
+     external: true
+
