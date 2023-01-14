@@ -1,0 +1,5 @@
+#!/bin/sh
+cd /home/pi/docker/compose/sistema && echo "\n*** Descargando imagenes nuevas SISTEMA ***\n" && docker compose pull && echo "\n*** Instalando imagenes nuevas ***\n" &&  docker compose up -d && echo "\n*** Borrando imagenes viejas ***\n" && docker image prune -a -f
+cd /home/pi/docker/compose/domotica && echo "\n*** Descargando imagenes nuevas DOMOTICA ***\n"  && docker compose pull && echo "\n*** Instalando imagenes nuevas ***\n" &&  docker compose up -d && echo "\n*** Borrando imagenes viejas ***\n" && docker image prune -a -f
+cd /home/pi/docker/compose/nube && echo "\n*** Descargando imagenes nuevas NUBE ***\n" && docker compose pull && echo "\n*** Instalando imagenes nuevas ***\n" &&  docker compose up -d && echo "\n*** Borrando imagenes viejas ***\n" && docker image prune -a -f
+cd /home/pi/docker/compose/media && echo "\n*** Descargando imagenes nuevas MEDIA ***\n"  && docker compose pull && echo "\n*** Instalando imagenes nuevas ***\n" &&  docker compose up -d && echo "\n*** Borrando imagenes viejas ***\n" && docker image prune -a -f
