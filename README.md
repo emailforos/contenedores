@@ -1,2 +1,2 @@
 # contenedores
-Docker-compose de mi instalación en la raspberry
+Estructura y ficheros para reconstruir los contenedores de mi raspberry.
