@@ -1,17 +1,16 @@
 version: "3"
 #name: media
 services:
-
-############################################################################
-#                       MULTIMEDIA                                         #
-############################################################################
+  ############################################################################
+  #                       MULTIMEDIA                                         #
+  ############################################################################
   jellyfin:
     container_name: jellyfin
     image: jellyfin/jellyfin
     restart: unless-stopped
-    network_mode: host    
-#    ports:
-#      - 8096:8096
+    network_mode: host
+    #    ports:
+    #      - 8096:8096
     volumes:
       - ${DOCKERSDIR}/jellyfin/config:/config
       - ${DOCKERSDIR}/jellyfin/cache:/cache
@@ -20,7 +19,6 @@ services:
       - ${MUSICADIR}:/media/music
       - /etc/localtime:/etc/localtime:ro
     user: ${PUID}:${PGID}
-
   sonarr:
     container_name: sonarr
     image: ghcr.io/linuxserver/sonarr
@@ -40,30 +38,8 @@ services:
       - jackett
       - qbittorrent
     networks:
-        sistema_default:
-            ipv4_address: ${APP_SONARR_IP}
-      
-  # medusa:
-  #   image: lscr.io/linuxserver/medusa:latest
-  #   container_name: medusa
-  #   environment:
-  #     - PUID=${PUID}
-  #     - PGID=${PGID}
-  #     - TZ=${TZ}
-  #   volumes:
-  #     - ${DOCKERSDIR}/medusa:/config
-  #     - ${DLDIR}:/downloads
-  #     - ${SERIESDIR}:/tv
-  #   ports:
-  #     - 8082:8081
-  #   restart: unless-stopped
-  #   depends_on:
-  #     - jackett
-  #     - qbittorrent
-  #   networks:
-  #       default:
-  #           ipv4_address: 172.20.0.4
-
+      reddocker:
+        ipv4_address: ${APP_SONARR_IP}
   radarr:
     container_name: radarr
     image: ghcr.io/linuxserver/radarr
@@ -76,17 +52,15 @@ services:
       - TZ=${TZ}
     volumes:
       - ${DOCKERSDIR}/radarr:/config
-#      - ${DLDIR}/completed:/downloads
       - ${DLDIR}:/downloads
       - ${PELISDIR}:/movies
-#      - /etc/localtime:/etc/localtime:ro
+    #      - /etc/localtime:/etc/localtime:ro
     depends_on:
       - jackett
       - qbittorrent
     networks:
-        sistema_default:
-            ipv4_address: ${APP_RADARR_IP}
-  
+      reddocker:
+        ipv4_address: ${APP_RADARR_IP}
   qbittorrent:
     image: lscr.io/linuxserver/qbittorrent:latest
     container_name: qbittorrent
@@ -99,14 +73,13 @@ services:
       - ${DOCKERSDIR}/qbittorrent/config:/config
       - ${DLDIR}:/downloads
     ports:
-      - 6881:6881
-      - 6881:6881/udp
+      - 61428:61428
+      - 61428:61428/udp
       - 8080:8080
     restart: unless-stopped
     networks:
-        sistema_default:
-            ipv4_address: ${APP_QBIT_IP}
-
+      reddocker:
+        ipv4_address: ${APP_QBIT_IP}
   jackett:
     image: ghcr.io/linuxserver/jackett
     container_name: jackett
@@ -123,89 +96,73 @@ services:
       - ${DLDIR}/completed:/downloads
       - /etc/localtime:/etc/localtime:ro
     networks:
-        sistema_default:
-            ipv4_address: ${APP_JACKETT_IP}
-    # sysctls:
-    #   - net.ipv6.conf.all.disable_ipv6=1
-
-  # ombi:
-  #   image: ghcr.io/linuxserver/ombi
-  #   container_name: ombi
-  #   restart: unless-stopped
-  #   ports:
-  #     - 3579:3579
-  #   environment:
-  #     - PUID=${PUID}
-  #     - PGID=${PGID}
-  #   volumes:
-  #     - ${DOCKERSDIR}/ombi:/config
-  #     - /etc/localtime:/etc/localtime:ro
-  #   depends_on:
-  #     - radarr
-  #     - sonarr
-  
-  calibre:
-    image: y484v/calibre
-    container_name: calibre
+      reddocker:
+        ipv4_address: ${APP_JACKETT_IP}
+  calibre-web:
+    image: lscr.io/linuxserver/calibre-web:latest
+    container_name: calibre-web
     environment:
       - PUID=${PUID}
       - PGID=${PGID}
       - TZ=${TZ}
+      - DOCKER_MODS=linuxserver/mods:universal-calibre #optional
+      - OAUTHLIB_RELAX_TOKEN_SCOPE=1
     volumes:
-      - ${DOCKERSDIR}/calibre:/config
-      - ${LOGS}/calibre:/var/log
-      - ${LIBROSDIR}:/books 
+      - ${DOCKERSDIR}/calibre-web:/config
+      - ${LIBROSDIR}:/books
     ports:
-      - 8083:8083
-    restart: always
+      - 8088:8083
+    restart: unless-stopped
     networks:
-        sistema_default:
-            ipv4_address: ${APP_CALIBRE_IP}
-
-#   airsonic:
-#     image: lscr.io/linuxserver/airsonic-advanced
-#     container_name: airsonic
-#     environment:
-#       - PUID=${PUID}
-#       - PGID=${PGID}
-#       - TZ=${TZ}
-# #      - CONTEXT_PATH=URL_BASE #optional
-# #      - JAVA_OPTS=options #optional
-#     volumes:
-#       - ${DOCKERSDIR}/airsonic/config:/config
-#       - ${MUSICADIR}:/music
-#       - ${DOCKERSDIR}/airsonic/playlists:/playlists
-#       - ${DOCKERSDIR}/airsonic/podcasts:/podcasts
-#       - ${DOCKERSDIR}/airsonic/otros:/media
-#     ports:
-#       - 4040:4040
-# #     devices:
-# #       - /dev/snd:/dev/snd #optional
-#     restart: unless-stopped
+      reddocker:
+        ipv4_address: ${APP_CALIBRE_WEB_IP}
+  #   airsonic:
+  #     image: lscr.io/linuxserver/airsonic-advanced
+  #     container_name: airsonic
+  #     environment:
+  #       - PUID=${PUID}
+  #       - PGID=${PGID}
+  #       - TZ=${TZ}
+  # #      - CONTEXT_PATH=URL_BASE #optional
+  # #      - JAVA_OPTS=options #optional
+  #     volumes:
+  #       - ${DOCKERSDIR}/airsonic/config:/config
+  #       - ${MUSICADIR}:/music
+  #       - ${DOCKERSDIR}/airsonic/playlists:/playlists
+  #       - ${DOCKERSDIR}/airsonic/podcasts:/podcasts
+  #       - ${DOCKERSDIR}/airsonic/otros:/media
+  #     ports:
+  #       - 4040:4040
+  # #     devices:
+  # #       - /dev/snd:/dev/snd #optional
+  #     restart: unless-stopped
 
   navidrome:
     image: deluan/navidrome:latest
     container_name: navidrome
     user: ${PUID}:${PGID} # should be owner of volumes
     ports:
-      - "4533:4533"
+      - 4533:4533
     restart: unless-stopped
     environment:
       # Optional: put your config options customization here. Examples:
       ND_SCANSCHEDULE: 1h
-      ND_LOGLEVEL: info  
+      ND_LOGLEVEL: info
       ND_SESSIONTIMEOUT: 24h
       ND_BASEURL: ""
       ND_TRANSCODINGCACHESIZE: 100MB
+      ND_LASTFM_ENABLED: true
+      ND_LASTFM_APIKEY: ${LASTFM_APIKEY}
+      ND_LASTFM_SECRET: ${LASTFM_SECRET}
+      ND_LASTFM_LANGUAGE: "es"
     volumes:
-      - "${DOCKERSDIR}/navidrome:/data"
-      - "${MUSICADIR}:/music:ro"
+      - ${DOCKERSDIR}/navidrome:/data
+      - ${MUSICADIR}:/music:ro
     networks:
-        sistema_default:
-            ipv4_address: ${APP_NAVIDROME_IP}
-  
+      reddocker:
+        ipv4_address: ${APP_NAVIDROME_IP}
   prowlarr:
-    image: cr.hotio.dev/hotio/prowlarr:testing
+    image: ghcr.io/hotio/prowlarr
     container_name: prowlarr
     environment:
       - PUID=${PUID}
@@ -218,9 +175,8 @@ services:
       - 9697:9696
     restart: unless-stopped
     networks:
-      sistema_default:
-          ipv4_address: ${APP_PROWLARR_IP}
-
+      reddocker:
+        ipv4_address: ${APP_PROWLARR_IP}
   bazarr:
     image: lscr.io/linuxserver/bazarr:latest
     container_name: bazarr
@@ -236,50 +192,49 @@ services:
       - 6767:6767
     restart: unless-stopped
     networks:
-      sistema_default:
-          ipv4_address: ${APP_BAZARR_IP}
-
-  jellyseerr:
-    image: fallenbagel/jellyseerr:latest
-    container_name: jellyseerr
+      reddocker:
+        ipv4_address: ${APP_BAZARR_IP}
+  nzbhydra2:
+    image: lscr.io/linuxserver/nzbhydra2:latest
+    container_name: nzbhydra2
     environment:
-      - LOG_LEVEL=debug
+      - PUID=${PUID}
+      - PGID=${PGID}
       - TZ=${TZ}
-    ports:
-        - 5055:5055
     volumes:
-      - ${APP_DATA_DIR}/jellyseerr/config:/app/config
+      - ${DOCKERSDIR}/nzbhydra:/config
+      - ${DLDIR}/completed:/downloads
+    ports:
+      - 5076:5076
     restart: unless-stopped
     networks:
-      sistema_default:
-          ipv4_address: ${APP_JELLYSEERR_IP}
-
-  # transmission:
-  #   image: lscr.io/linuxserver/transmission:latest
-  #   container_name: transmission
-  #   environment:
-  #     - PUID=${PUID}
-  #     - PGID=${PGID}
-  #     - TZ=${TZ}
-  #     - TRANSMISSION_WEB_HOME=/combustion-release/ #optional
-  #     - USER=${USER} #optional
-  #     - PASS=${PASS} #optional
-  #     - WHITELIST=iplist #optional
-  #     - PEERPORT=peerport #optional
-  #     - HOST_WHITELIST=dnsname list #optional
-  #   volumes:
-  #     - ${DOCKERSDIR}/transmission/config:/config
-  #     - ${DLDIR}:/downloads:/downloads
-  #     - ${DLDIR}:/downloads:/watch
-  #   ports:
-  #     - 9091:9091
-  #     - 51413:51413
-  #     - 51413:51413/udp
-  #   restart: unless-stopped
-  #   networks:
-  #     sistema_default:
-  #         ipv4_address: ${APP_TRANSMISSION_IP}
-
+      reddocker:
+        ipv4_address: ${APP_NZBH_IP}
+  amule:
+    image: ngosang/amule
+    container_name: amule
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+      - GUI_PWD=${PASS}
+      - WEBUI_PWD=${PASS}
+      - MOD_AUTO_RESTART_ENABLED=true
+      - MOD_AUTO_RESTART_CRON=0 3 * * *
+    ports:
+      - 4711:4711 # web ui
+      - 4712:4712 # remote gui, webserver, cmd ...
+      - 4662:4662 # ed2k tcp
+      - 4665:4665/udp # ed2k global search udp (tcp port +3)
+      - 4672:4672/udp # ed2k udp
+    volumes:
+      - $HOME/docker/amule:/home/amule/.aMule
+      - ${DLDIR}/completed:/incoming
+      - ${DLDIR}/incompleted:/temp
+    restart: unless-stopped
+    networks:
+      reddocker:
+        ipv4_address: ${APP_AMULE_IP}
 # Redes
 #networks:
 #  default:
@@ -288,5 +243,5 @@ services:
 #      config:
 #        - subnet: 172.20.0.0/24
 networks:
-  sistema_default:
-     external: true
+  reddocker:
+    external: true
