@@ -1,13 +1,12 @@
 version: "3"
 # name: nube
 services:
-
-###############################################################################
-#                              NEXTCLOUD                                      #
-###############################################################################
+  ########################################################################
+  #                              NEXTCLOUD                               #
+  ########################################################################
 
   mariadb:
-    image: ghcr.io/linuxserver/mariadb:alpine
+    image: lscr.io/linuxserver/mariadb:latest
     container_name: mariadb
     environment:
       - PUID=${PUID}
@@ -18,15 +17,15 @@ services:
       - MYSQL_USER=${MYSQL_USER}
       - MYSQL_PASSWORD=${CONTRASENA}
     volumes:
-      - ${DOCKERSDIR}/mariadb/:/config
-      - ${DOCKERSDIR}/mariadb/conf.d:/etc/mysql/conf.d
+      - /home/javier/docker/mariadb/:/config
+      - /home/javier/docker/mariadb/conf.d:/etc/mysql/conf.d
     ports:
       - 3306:3306
     restart: unless-stopped
     networks:
-        sistema_default:
-            ipv4_address: ${APP_MARIADB_IP}
-
+      reddocker:
+        ipv4_address: ${APP_MARIADB_IP}
+        
   nextcloud:
     image: ghcr.io/linuxserver/nextcloud
     container_name: nube
@@ -46,39 +45,27 @@ services:
       - mariadb
     restart: always
     networks:
-        sistema_default:
-            ipv4_address: ${APP_NEXTCLOUD_IP}
-
-
-###############################################################################
-#                              RECETAS                                        #
-###############################################################################  
-
-  mealie:
-    container_name: mealie
-    image: hkotel/mealie:latest
+      reddocker:
+        ipv4_address: ${APP_NEXTCLOUD_IP}
+        
+  phpmyadmin:
+    image: arm64v8/phpmyadmin
+    container_name: phpmyadmin
     restart: always
     ports:
-      - 9925:80
+      - 9980:80
     environment:
-      - PUID=${PUID}
-      - PGID=${PGID}
-      - TZ=${TZ}
-    volumes:
-      - ${DOCKERSDIR}/mealie/data:/app/data
-    restart: unless-stopped
+      # MYSQL_USER: root
+      # MYSQL_PASSWORD: 15230247
+      # MYSQL_ROOT_PASSWORD: 15230247
+      - PMA_ARBITRARY=1 # display the field to enter the server to connect to
+      - UPLOAD_LIMIT=300000000 # increased to 300 MB approx  
+    links:
+      - mariadb:mariadb
     networks:
-        sistema_default:
-            ipv4_address: ${APP_MEALIE_IP}
-
-# Redes
-#networks:
-#  default:
-#    ipam:
-#      driver: default
-#      config:
-#        - subnet: 172.20.0.0/24
+      reddocker:
+        ipv4_address: ${APP_PHPMYADMIN_IP}
+        
 networks:
-  sistema_default:
-     external: true
-
+  reddocker:
+    external: true
