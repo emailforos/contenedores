@@ -1,113 +1,68 @@
 version: "3"
 # name: sis
+
 services:
-  
-####################################################################
-#              DOMINIOS, CERTIFICADOS Y PROXY                      #
-####################################################################
+  ####################################################################
+  #              DOMINIOS, CERTIFICADOS Y PROXY                      #
+  ####################################################################
 
-  duckdns:
-    image: ghcr.io/linuxserver/duckdns
-    container_name: duckdns
-    environment:
-      - PUID=${PUID}
-      - PGID=${PGID}
-      - TZ=${TZ}
-      - SUBDOMAINS=${SUBDOMINIOS}
-      - TOKEN=${DUCK_TOKEN}
-      - LOG_FILE=true 
+  inadyn:
+    container_name: inadyn
     volumes:
-      - $HOME/docker/duckdns/config:/config
+      - ${DOCKERSDIR}/inadyn/inadyn.conf:/etc/inadyn.conf
+    image: troglobit/inadyn:latest
     restart: unless-stopped
     networks:
-        default:
-            ipv4_address: ${APP_DUCKDNS_IP}
-
-  swag:
-    image: lscr.io/linuxserver/swag:latest
-    container_name: swag
-    cap_add:
-      - NET_ADMIN
-    environment:
-      - PUID=${PUID}
-      - PGID=${PGID}
-      - TZ=${TZ}
-      - URL=${DUCKURL}
-      - SUBDOMAINS=wildcard
-      - VALIDATION=duckdns
-      - DUCKDNSTOKEN=${DUCK_TOKEN}
-      - EMAIL=${DUCKMAIL}
-      - DHLEVEL=2048
-      - ONLY_SUBDOMAINS=true
-      - DOCKER_MODS=linuxserver/mods:swag-dashboard
-    volumes:
-      - ${DOCKERSDIR}/swag:/config
+      reddocker:
+        ipv4_address: ${APP_DUCKDNS_IP}
+  caddy:
+    image: caddy
     ports:
-      - 443:443
       - 80:80
-      - 8082:81
-    restart: unless-stopped
-    networks:
-        default:
-            ipv4_address: ${APP_SWAG_IP}
+      - 443:443
+      - 443:443/udp
+    volumes:
+      - ${DOCKERSDIR}/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - ${DOCKERSDIR}/caddy/data:/data
+      - ${DOCKERSDIR}/caddy/config:/config
 
-######################################################################################
-#                        SISTEMA                                                     #
-######################################################################################
+    restart: unless-stopped
+    container_name: caddy
+    networks:
+      reddocker:
+        ipv4_address: ${APP_CADDY_IP}
+
+  #####################################################################
+  #                    SISTEMA                                        #
+  #####################################################################
 
   portainer:
-    image: portainer/portainer-ce
+    image: portainer/portainer-ce:latest
     container_name: portainer
     restart: always
     ports:
-      - 9000:9000
+      - 60004:9443
+      - 50004:9000
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - ${DOCKERSDIR}/portainer/portainer_data:/data
     networks:
-        default:
-            ipv4_address: ${APP_PORTAINER_IP}
-
-  # adguard-home:
-  #   image: adguard/adguardhome
-  #   container_name: "adguard"
-  #   network_mode: host
-  #   restart: unless-stopped
-  #   # dns:
-  #   #   - 127.0.0.1
-  #   #   - 1.1.1.1
-  #   environment:
-  #     - PUID=${PUID}
-  #     - PGID=${PGID}
-  #     - TZ=${TZ}
-  #   # ports:
-  #   #   - '53:53/tcp'
-  #   #   - '53:53/udp'
-  #   #   - '67:67/udp'
-  #   #   - '68:68/tcp'
-  #   #   - '68:68/udp'
-  #   #   - '80:80/tcp'
-  #   #   - '443:443/tcp'
-  #   #   - '8053:80/tcp'
-  #   #   - '853:853/tcp'
-  #   #   - '3000:3000/tcp'
-  #   volumes:
-  #     - ${DOCKERSDIR}/adguard/work:/opt/adguardhome/work:rw
-  #     - ${DOCKERSDIR}/adguard/confdir:/opt/adguardhome/conf:rw
-  #   restart: unless-stopped
+      reddocker:
+        ipv4_address: ${APP_PORTAINER_IP}
 
   pihole:
     container_name: pihole
+    depends_on:
+      - unbound
     image: pihole/pihole:latest
     # For DHCP it is recommended to remove these ports and instead add: network_mode: "host"
     ports:
-      - "53:53/tcp"
-      - "192.168.1.151:53:53/udp"
-#      - "67:67/udp" # Only required if you are using Pi-hole as your DHCP server
-      - "8084:80/tcp"
-#    dns:
-#      - "127.0.0.1"
-#      - "1.1.1.1"
+      - 53:53/tcp
+      - 192.168.1.151:53:53/udp
+      - 8084:80/tcp
+    dns:
+      - "127.0.0.1"
+      - ${APP_UNBOUND_IP}
     environment:
       TZ: ${TZ}
       WEBPASSWORD: ${CONTRASENA}
@@ -116,12 +71,25 @@ services:
       - ${DOCKERSDIR}/pihole/etc-pihole:/etc/pihole
       - ${DOCKERSDIR}/pihole/etc-dnsmasq.d:/etc/dnsmasq.d
     #   https://github.com/pi-hole/docker-pi-hole#note-on-capabilities
-#    cap_add:
-#      - NET_ADMIN # Required if you are using Pi-hole as your DHCP server, else not needed
+    #    cap_add:
+    #      - NET_ADMIN # Required if you are using Pi-hole as your DHCP server, else not needed
     restart: unless-stopped
     networks:
-        default:
-            ipv4_address: ${APP_PIHOLE_IP}
+      reddocker:
+        ipv4_address: ${APP_PIHOLE_IP}
+        
+  unbound:
+    image: mvance/unbound:latest
+    container_name: unbound
+    restart: unless-stopped
+    hostname: unbound
+    volumes:
+      - ${DOCKERSDIR}/unbound:/opt/unbound/etc/unbound/
+    networks:
+      reddocker:
+        ipv4_address: ${APP_UNBOUND_IP}
+    cap_add:
+      - NET_ADMIN
 
   wireguard:
     image: ghcr.io/linuxserver/wireguard
@@ -133,10 +101,10 @@ services:
       - PUID=${PUID}
       - PGID=${PGID}
       - TZ=${TZ}
-      - SERVERURL=${URL_WIREGUARD} 
-      - SERVERPORT=51820 
+      - SERVERURL=${URL_WIREGUARD}
+      - SERVERPORT=51820
       - PEERS=MVJ,MVS,PTS,PCTJ,PTE,PTX,TBE,MVE,MVX
-      - PEERDNS=auto 
+      - PEERDNS=auto
       - INTERNAL_SUBNET=10.13.13.0
       - ALLOWEDIPS=172.20.0.0/16,10.13.13.1/32,192.168.1.0/24
     volumes:
@@ -152,55 +120,27 @@ services:
       - ${APP_PIHOLE_IP}
     restart: unless-stopped
     networks:
-        default:
-            ipv4_address: ${APP_WIREGUARD_IP}
+      reddocker:
+        ipv4_address: ${APP_WIREGUARD_IP}
 
-  # wg-easy:
-  #   environment:
-  #     # ⚠️ Required:
-  #     # Change this to your host's public address
-  #     - WG_HOST=vpn.vimo.duckdns.org
-
-  #     # Optional:
-  #     - PASSWORD=${CONTRASENA}
-  #     # - WG_PORT=51820
-  #     # - WG_DEFAULT_ADDRESS=10.8.0.x
-  #     # - WG_DEFAULT_DNS=1.1.1.1
-  #     # - WG_MTU=1420
-  #     # - WG_ALLOWED_IPS=192.168.1.0/24
-      
-  #   image: weejewel/wg-easy
-  #   container_name: wireguard
-  #   volumes:
-  #     - /home/docker/wireguard:/etc/wireguard
-  #   ports:
-  #     - "51820:51820/udp"
-  #     - "51821:51821/tcp"
-  #   restart: unless-stopped
-  #   cap_add:
-  #     - NET_ADMIN
-  #     - SYS_MODULE
-  #   sysctls:
-  #     - net.ipv4.ip_forward=1
-  #     - net.ipv4.conf.all.src_valid_mark=1
-
-  heimdall:
-    image: lscr.io/linuxserver/heimdall:latest
-    container_name: heimdall
-    environment:
-      - PUID=${PUID}
-      - PGID=${PGID}
-      - TZ=${TZ}
+  homarr:
+    container_name: homarr
+    image: ghcr.io/ajnart/homarr:latest
+    restart: always
     volumes:
-      - ${DOCKERSDIR}/heimdall/config:/config
+      - $HOME/docker/homarr/configs:/app/data/configs
+      - $HOME/docker/homarr/icons:/app/public/icons
+      - $HOME/docker/homarr/data:/data
+      - /var/run/docker.sock:/var/run/docker.sock:ro
     ports:
-      - 380:80
-      - 3443:443
-    restart: unless-stopped
+      - 7575:7575
+    environment:
+      - TZ=${TZ}
+    #      - EDIT_MODE_PASSWORD=10077473
     networks:
-        default:
-            ipv4_address: ${APP_HEIMDALL_IP}
-    
+      reddocker:
+        ipv4_address: ${APP_HOMARR_IP}
+
   diun:
     image: ghcr.io/crazy-max/diun
     container_name: diun
@@ -223,83 +163,107 @@ services:
     #   - diun.enable=true
     #   - diun.watch_repo=true
     networks:
-        default:
-            ipv4_address: ${APP_DIUN_IP}
-
-  # duplicati:
-  #   image: ghcr.io/linuxserver/duplicati
-  #   container_name: duplicati
-  #   environment:
-  #     - PUID=0
-  #     - PGID=0
-  #     - TZ=${TZ}
-  #   volumes:
-  #     - ${DOCKERSDIR}/duplicati/config:/config
-  #     - ${DOCKERSDIR}/duplicati/backups:/backups
-  #     - ${DOCKERSDIR}:/source
-  #   ports:
-  #     - 8200:8200
-  #   restart: unless-stopped
+      reddocker:
+        ipv4_address: ${APP_DIUN_IP}
 
   duplicati:
-    image: duplicati/duplicati:canary
+    image: lscr.io/linuxserver/duplicati:arm64v8-development
     container_name: duplicati
-    hostname: duplicati
-    restart: always
-    # Recommendation: Duplicati needs root user to get access to all files
-    user: "${DOCKER_ROOTPUID:-0}:${DOCKER_ROOTPGID:-0}"
-    network_mode: bridge
+    environment:
+      - PUID=${DOCKER_ROOTPUID:-0}
+      - PGID=${DOCKER_ROOTPGID:-0}
+      - TZ=${TZ}
+    volumes:
+      - ${DOCKERSDIR}/duplicati/data/config:/config
+      - ${DOCKERSDIR}/duplicati/backups:/backups
+      - ${DOCKERSDIR}:/source
     ports:
       - 8200:8200
-    volumes:
-      - ${DOCKERSDIR}/duplicati/data:/data:rw
-      - ${DOCKERSDIR}/duplicati/backups:/backups:rw
-      - ${DOCKERSDIR}:/source:ro
-    environment:
-      - TZ=${TZ}
+    restart: unless-stopped
     networks:
-        default:
-            ipv4_address: ${APP_DUPLICATI_IP}
+      reddocker:
+        ipv4_address: ${APP_DUPLICATI_IP}
+
+  kopia:
+    image: kopia/kopia:latest
+    hostname: kopia
+    container_name: kopia
+    restart: unless-stopped
+    # Recommendation: Kopia needs root user to get access to all files
+    user: ${DOCKER_ROOTPUID:-0}:${DOCKER_ROOTPGID:-0}
+    privileged: true
+    cap_add:
+      - SYS_ADMIN
+    devices:
+      - /dev/fuse:/dev/fuse:rwm
+    ports:
+      - 51515:51515
+    # Setup the server that provides the web gui
+    command:
+      - server
+      - start
+      - --disable-csrf-token-checks
+      - --insecure
+      - --address=0.0.0.0:51515
+      - --server-username=${MYSQL_USER}
+      - --server-password=${PASS}
+    environment:
+      # Set repository password
+      KOPIA_PASSWORD: ${KOPIA_REPOSITORY_PASS}
+      USER: ${MYSQL_USER}
+      TZ: ${TZ}
+    volumes:
+      # Mount local folders needed by kopia
+      - ${DOCKERSDIR}/kopia/config:/app/config
+      - ${DOCKERSDIR}/kopia/cache:/app/cache
+      - ${LOGS}/kopia:/app/logs
+      - ${DOCKERSDIR}:/data:ro
+      - ${DOCKERSDIR}/kopia/repository:/repository
+      - ${DOCKERSDIR}/kopia/tmp:/tmp:shared
+    networks:
+      reddocker:
+        ipv4_address: ${APP_KOPIA_IP}
 
   filebrowser:
-    image: filebrowser/filebrowser
+    image: filebrowser/filebrowser:latest
     container_name: filebrowser
-    user: "${PUID}:${PGID}"
+    user: 0:0
     ports:
       - 580:80
     volumes:
-#      - ${HOME}:/srv
+      #      - ${HOME}:/srv
       - /:/srv
       - ${DOCKERSDIR}/filebrowser/filebrowser.db:/database.db
       - ${DOCKERSDIR}/filebrowser/.filebrowser.json:/.filebrowser.json
     restart: unless-stopped
     networks:
-        default:
-            ipv4_address: ${APP_FILEBROWSER_IP}
+      reddocker:
+        ipv4_address: ${APP_FILEBROWSER_IP}
 
   bitwarden:
     image: vaultwarden/server:latest
     container_name: vaultwarden
     restart: always
     environment:
-      - WEBSOCKET_ENABLED=true  # Enable WebSocket notifications.
+      - WEBSOCKET_ENABLED=true # Enable WebSocket notifications.
       - ADMIN_TOKEN=${BITWARDEN_TOKEN}
     volumes:
       - $HOME/docker/bitwarden/data:/data
     ports:
-      - "680:80" # web ui
+      - 680:80 # web ui
     networks:
-        default:
-            ipv4_address: ${APP_BITWARDEN_IP}
-
+      reddocker:
+        ipv4_address: ${APP_BITWARDEN_IP}
+        
   scrutiny:
     container_name: scrutiny
     image: ghcr.io/analogj/scrutiny:master-omnibus
     cap_add:
       - SYS_RAWIO
+      - SYS_ADMIN
     ports:
-      - "8081:8080" # webapp
-      - "8086:8086" # influxDB admin
+      - 8081:8080 # webapp
+      - 8086:8086 # influxDB admin
     volumes:
       - /run/udev:/run/udev:ro
       - $HOME/docker/scrutiny/config:/opt/scrutiny/config
@@ -307,65 +271,25 @@ services:
     devices:
       - "/dev/sda"
     networks:
-        default:
-            ipv4_address: ${APP_SCRUTINY_IP}
-
-  glances:
-    container_name: glances
-    image: joweisberg/glances:latest
-    restart: unless-stopped
-    pid: host
-    ports:
-      - 61208:61208
-    environment:
-      - TZ=${TZ}
-      - GLANCES_OPT=--webserver
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock:ro
-      - /var/docker/glances:/glances/conf
-    networks:
-        default:
-            ipv4_address: ${APP_GLANCES_IP}
-
-  # syncthing:
-  #   image: lscr.io/linuxserver/syncthing:latest
-  #   container_name: syncthing
-  #   hostname: syncthing
-  #   environment:
-  #     - PUID=0
-  #     - PGID=0
-  #     - TZ=${TZ}
-  #   volumes:
-  #     - ${DOCKERSDIR}/syncthing/config:/config
-  #     - ${DOCKERSDIR}:/CSPI/docker
-  #     - /home/pi/medios:/CSPI/medios
-  #   ports:
-  #     - 8384:8384
-  #     - 22000:22000/tcp
-  #     - 22000:22000/udp
-  #     - 21027:21027/udp
-  #   restart: unless-stopped
-  #   networks:
-  #       default:
-  #           ipv4_address: 172.20.0.25
+      reddocker:
+        ipv4_address: ${APP_SCRUTINY_IP}
 
 # Redes
 networks:
-  default:
+  reddocker:
     ipam:
       driver: default
       config:
         - subnet: ${GLOBAL_SUBNET}
-
+    name: reddocker
+    
 volumes:
-  portainer_data:
-  # db:
-  #   driver: local
-  # music:
-  #   driver: local
-  # covers:
-  #   driver: local
-  # search_index:
-  #   driver: local
-
-
+  portainer_data: null
+    # db:
+    #   driver: local
+    # music:
+    #   driver: local
+    # covers:
+    #   driver: local
+    # search_index:
+    #   driver: local
